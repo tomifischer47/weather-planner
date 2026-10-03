@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sähkö">
+<meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11161c" media="(prefers-color-scheme: dark)">
+<title>Helsinki Spot Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column of answer cards under a "now" strip and a price chart; phone first. */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --fg:#17202a; --muted:#5d6a78; --line:#dde3ea;
+  --accent:#1f5fbf; --accent-soft:#e3ecfa;
+  --good:#1d7a4c; --good-soft:#dff2e8; --warn:#a2620a; --warn-soft:#fbefd9; --bad:#b42a2a; --bad-soft:#f9e1e1;
+  --font-ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-num:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#11161c; --surface:#19212a; --fg:#e6ebf0; --muted:#93a1b0; --line:#2a3440;
+  --accent:#7aa8f0; --accent-soft:#1d2d47;
+  --good:#5cc78f; --good-soft:#163527; --warn:#e8ae55; --warn-soft:#3a2d16; --bad:#f07a7a; --bad-soft:#3d1c1e;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11161c; --surface:#19212a; --fg:#e6ebf0; --muted:#93a1b0; --line:#2a3440;
+  --accent:#7aa8f0; --accent-soft:#1d2d47;
+  --good:#5cc78f; --good-soft:#163527; --warn:#e8ae55; --warn-soft:#3a2d16; --bad:#f07a7a; --bad-soft:#3d1c1e;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font-ui);-webkit-text-size-adjust:100%}
+main{max-width:560px;margin:0 auto;padding:16px 16px 40px;display:flex;flex-direction:column;gap:14px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:1.05rem;font-weight:700;margin:0;letter-spacing:.01em}
+.sub{color:var(--muted);font-size:.82rem}
+button{font:inherit;color:inherit}
+.refresh{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:.85rem;cursor:pointer}
+.refresh:focus-visible,.card:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.now{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.now .big{font-size:2.3rem;font-weight:600;line-height:1}
+.now .unit{color:var(--muted);font-size:.9rem}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.lv-good{color:var(--good);background:var(--good-soft)}
+.lv-mid{color:var(--muted);background:var(--line)}
+.lv-warn{color:var(--warn);background:var(--warn-soft)}
+.lv-bad{color:var(--bad);background:var(--bad-soft)}
+
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 10px 4px}
+.chart svg{display:block;width:100%;height:auto}
+.chart .legend{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:.75rem;padding:4px 2px 2px;flex-wrap:wrap}
+
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;text-align:left;width:100%}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.card .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.card .label{font-size:.74rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card .dur{font-size:.78rem;color:var(--muted)}
+.card .answer{font-size:1.35rem;font-weight:600;line-height:1.2;text-wrap:balance}
+.card .meta{color:var(--muted);font-size:.86rem}
+.rows{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:8px}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:.86rem}
+.row span:first-child{color:var(--muted);min-width:0}
+.row span:last-child{text-align:right;white-space:nowrap}
+.pos{color:var(--good)} .negv{color:var(--bad)}
+.days{display:flex;flex-direction:column;gap:6px}
+.day{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.9rem}
+.empty{color:var(--muted);font-size:.9rem}
+
+details{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 16px}
+summary{cursor:pointer;font-weight:600;font-size:.9rem;padding:2px 0}
+.settings{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;padding:10px 0 4px;font-size:.88rem}
+.settings input{width:5.5em;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit;font-family:var(--font-num);text-align:right}
+.settings .hint{grid-column:1/-1;color:var(--muted);font-size:.8rem}
+.err{background:var(--bad-soft);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:.9rem;display:flex;flex-direction:column;gap:6px}
+.err .detail{font-size:.75rem;opacity:.85;overflow-wrap:anywhere;user-select:text}
+footer{color:var(--muted);font-size:.78rem;line-height:1.5}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s,box-shadow .15s}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Helsinki Spot Planner</h1>
+      <div class="sub" id="coverage">Loading prices…</div>
+    </div>
+    <button class="refresh" id="refresh" type="button">Refresh</button>
+  </header>
+
+  <div id="error" class="err" hidden></div>
+
+  <section class="now" aria-live="polite">
+    <span class="big num" id="nowPrice">–</span>
+    <span class="unit">c/kWh now</span>
+    <span id="nowChip"></span>
+  </section>
+
+  <section class="chart" aria-label="Upcoming prices">
+    <svg id="chart" viewBox="0 0 400 130" role="img" aria-label="Bar chart of upcoming 15-minute prices"></svg>
+    <div class="legend"><span id="chartSel">Tap a card to highlight its time block</span><span>c/kWh incl. VAT</span></div>
+  </section>
+
+  <section class="cards" id="cards"></section>
+
+  <details id="settingsBox">
+    <summary>Settings</summary>
+    <div class="settings">
+      <label for="kwhDish">Dishwasher, kWh per run</label><input id="kwhDish" type="number" step="0.1" min="0">
+      <label for="kwhLaundry">Laundry, kWh per load</label><input id="kwhLaundry" type="number" step="0.1" min="0">
+      <label for="kwhDinner">Dinner, kWh for 1 h of cooking</label><input id="kwhDinner" type="number" step="0.1" min="0">
+      <label for="kwhCharge">Charging, kWh over 6 h</label><input id="kwhCharge" type="number" step="0.1" min="0">
+      <label for="extra">Extras on top of spot, c/kWh</label><input id="extra" type="number" step="0.1" min="0">
+      <p class="hint">Extras are your retailer margin, Helen transfer fee and electricity tax. They raise what dinner costs but don't change any of the savings, since they're the same at every hour.</p>
+    </div>
+  </details>
+
+  <footer>
+    Spot prices for the Finland bidding zone in 15-minute steps, shown with 25.5 % VAT. Data from Nord Pool via the Elering dashboard API, with Pörssisähkö.net as backup. Tomorrow's prices usually appear around 14:00.
+  </footer>
+</main>
+
+<script id="logic">
+/* ===== Pure logic (tested separately) ===== */
+const SLOT = 15 * 60 * 1000;
+const DAY = 24 * 60 * 60 * 1000;
+const VAT = 1.255;
+const TZ = "Europe/Helsinki";
+
+// €/MWh excl. VAT -> c/kWh incl. VAT (no VAT on negative prices)
+function eurMwhToCents(p) { const c = p / 10; return c > 0 ? c * VAT : c; }
+
+const _fmtParts = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", weekday: "short" });
+function hk(t) {
+  const o = {};
+  for (const p of _fmtParts.formatToParts(new Date(t))) o[p.type] = p.value;
+  return { key: `${o.year}-${o.month}-${o.day}`, h: +o.hour, m: +o.minute, wd: o.weekday, hm: `${o.hour}:${o.minute}` };
+}
+
+// Turn a map of ts->price into a sorted array of 15-min slots
+function toSlots(map) { return [...map.entries()].map(([t, p]) => ({ t: +t, p })).sort((a, b) => a.t - b.t); }
+
+// All contiguous windows of n slots: [{start, end, avg}]
+function windows(slots, n) {
+  const out = [];
+  for (let i = 0; i + n <= slots.length; i++) {
+    if (slots[i + n - 1].t - slots[i].t !== (n - 1) * SLOT) continue;
+    let s = 0; for (let j = i; j < i + n; j++) s += slots[j].p;
+    out.push({ start: slots[i].t, end: slots[i].t + n * SLOT, avg: s / n });
+  }
+  return out;
+}
+function minBy(arr, f) { let b = null; for (const x of arr) if (!b || f(x) < f(b)) b = x; return b; }
+function maxBy(arr, f) { let b = null; for (const x of arr) if (!b || f(x) > f(b)) b = x; return b; }
+function mean(xs) { return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null; }
+
+function analyse(allSlots, now) {
+  const nowSlot = Math.floor(now / SLOT) * SLOT;
+  const up = allSlots.filter(s => s.t >= nowSlot);
+  const hist = allSlots.filter(s => s.t < nowSlot && s.t >= nowSlot - 7 * DAY);
+  const weekAvg = mean(hist.map(s => s.p));
+  const current = allSlots.find(s => s.t === nowSlot) || null;
+
+  // Dishwasher: 3h15m = 13 slots
+  const w13 = windows(up, 13);
+  const dish = w13.length ? {
+    best: minBy(w13, w => w.avg), worst: maxBy(w13, w => w.avg),
+    now: w13.find(w => w.start === nowSlot) || null,
+  } : null;
+
+  // Laundry: 1h30m = 6 slots; compare with cheapest 1.5h block in the past week
+  const w6 = windows(up, 6);
+  const w6hist = windows(hist, 6);
+  const laundry = w6.length ? {
+    best: minBy(w6, w => w.avg), worst: maxBy(w6, w => w.avg),
+    weekBest: minBy(w6hist, w => w.avg),
+  } : null;
+
+  // Dinner: 1h blocks starting 17:00–20:00 Helsinki time, per evening
+  const w4 = windows(up, 4).filter(w => { const a = hk(w.start); const mins = a.h * 60 + a.m; return mins >= 17 * 60 && mins <= 20 * 60; });
+  const evenings = {};
+  for (const w of w4) { const k = hk(w.start).key; (evenings[k] = evenings[k] || []).push(w); }
+  const dinner = Object.keys(evenings).sort().map(k => ({ key: k, best: minBy(evenings[k], w => w.avg), worst: maxBy(evenings[k], w => w.avg) }));
+  const histEvening = hist.filter(s => { const a = hk(s.t); return a.h >= 17 && a.h < 21; });
+  const dinnerWeekAvg = mean(histEvening.map(s => s.p));
+
+  // Charging: 6h = 24 slots
+  const w24 = windows(up, 24);
+  const charge = w24.length ? { best: minBy(w24, w => w.avg) } : null;
+
+  // Bad days: most expensive 6h block, plus per-day averages
+  const worst6 = w24.length ? maxBy(w24, w => w.avg) : null;
+  const byDay = {};
+  for (const s of allSlots) { if (s.t < nowSlot - DAY) continue; const k = hk(s.t).key; (byDay[k] = byDay[k] || []).push(s.p); }
+  const todayKey = hk(now).key;
+  const days = Object.keys(byDay).sort().filter(k => k >= todayKey && byDay[k].length >= 88)
+    .map(k => ({ key: k, avg: mean(byDay[k]), max: Math.max(...byDay[k]) }));
+
+  return { nowSlot, up, hist, weekAvg, current, dish, laundry, dinner, dinnerWeekAvg, charge, worst6, days,
+           histDays: hist.length / 96, lastSlot: allSlots.length ? allSlots[allSlots.length - 1].t + SLOT : null };
+}
+
+// Price level relative to the past week (fallback: absolute thresholds)
+function level(p, ref) {
+  if (ref != null && ref > 0.5) {
+    const r = p / ref;
+    if (r < 0.75) return ["good", "Cheap"];
+    if (r < 1.25) return ["mid", "Normal"];
+    if (r < 1.75) return ["warn", "High"];
+    return ["bad", "Very high"];
+  }
+  if (p < 3) return ["good", "Cheap"];
+  if (p < 8) return ["mid", "Normal"];
+  if (p < 15) return ["warn", "High"];
+  return ["bad", "Very high"];
+}
+if (typeof module !== "undefined") module.exports = { SLOT, DAY, eurMwhToCents, hk, toSlots, windows, analyse, level };
+</script>
+
+<script>
+/* ===== Data loading ===== */
+const CACHE_KEY = "hsp-prices-v1", SET_KEY = "hsp-settings-v1";
+const DEFAULTS = { kwhDish: 1.0, kwhLaundry: 1.0, kwhDinner: 2.0, kwhCharge: 3.0, extra: 0 };
+let settings = { ...DEFAULTS };
+let selected = "dish";
+let last = null;
+
+function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function recall(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+
+async function fetchJson(url, ms = 12000) {
+  const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), ms);
+  try { const r = await fetch(url, { signal: ctl.signal }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
+  finally { clearTimeout(id); }
+}
+
+async function fromElering(now) {
+  const start = new Date(now - 8 * DAY).toISOString(), end = new Date(now + 3 * DAY).toISOString();
+  const j = await fetchJson(`https://dashboard.elering.ee/api/nps/price?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
+  const rows = (j && j.data && j.data.fi) || [];
+  const m = new Map();
+  rows.sort((a, b) => a.timestamp - b.timestamp);
+  rows.forEach((r, i) => {
+    const t = r.timestamp * 1000;
+    const next = rows[i + 1] ? rows[i + 1].timestamp * 1000 : t + SLOT;
+    const span = Math.max(SLOT, Math.min(next - t, 60 * 60 * 1000)); // hourly rows fill four slots
+    for (let s = t; s < t + span; s += SLOT) m.set(s, eurMwhToCents(r.price));
+  });
+  return m;
+}
+async function fromPorssisahko() {
+  const j = await fetchJson("https://api.porssisahko.net/v2/latest-prices.json");
+  const m = new Map();
+  for (const r of (j.prices || [])) m.set(Date.parse(r.startDate), r.price);
+  return m;
+}
+
+async function load() {
+  const now = Date.now();
+  const merged = new Map();
+  const cached = recall(CACHE_KEY) || [];
+  for (const [t, p] of cached) if (t > now - 10 * DAY) merged.set(t, p);
+  const [el, ps] = await Promise.allSettled([fromElering(now), fromPorssisahko()]);
+  if (ps.status === "fulfilled") for (const [t, p] of ps.value) merged.set(t, p);
+  if (el.status === "fulfilled") for (const [t, p] of el.value) merged.set(t, p);
+  const sources = [el.status === "fulfilled" && el.value.size ? "Elering" : null, ps.status === "fulfilled" && ps.value.size ? "Pörssisähkö" : null].filter(Boolean);
+  store(CACHE_KEY, [...merged.entries()]);
+  const errors = [];
+  if (el.status === "rejected") errors.push(`Elering: ${describe(el.reason)}`);
+  if (ps.status === "rejected") errors.push(`Pörssisähkö: ${describe(ps.reason)}`);
+  return { slots: toSlots(merged), sources, now, errors };
+}
+function describe(e) {
+  if (!e) return "unknown error";
+  if (e.name === "AbortError") return "timed out after 12 s";
+  return `${e.name || "Error"}: ${e.message || e}`;
+}
+// Record anything the host's Content Security Policy blocks, so the error box can name it
+const cspBlocks = [];
+document.addEventListener("securitypolicyviolation", e => {
+  cspBlocks.push(`${e.effectiveDirective || e.violatedDirective} blocked ${e.blockedURI || "a request"}`);
+});
+function diagnostics(errors) {
+  const parts = [...(errors || [])];
+  if (cspBlocks.length) parts.push("Site security policy: " + [...new Set(cspBlocks)].join("; "));
+  if (navigator.onLine === false) parts.push("Browser reports it is offline");
+  parts.push(`Page address: ${location.origin}`);
+  return parts.join(" · ");
+}
+
+/* ===== Formatting ===== */
+const c2 = p => p.toFixed(2);
+function money(eur) {
+  const a = Math.abs(eur);
+  return a < 1 ? `${(a * 100).toFixed(a * 100 < 10 ? 1 : 0)} c` : `€${a.toFixed(2)}`;
+}
+function when(t, now) {
+  const a = hk(t), today = hk(now).key, tom = hk(now + DAY).key;
+  const d = a.key === today ? "Today" : a.key === tom ? "Tomorrow" : a.wd;
+  return `${d} ${a.hm}`;
+}
+function dayName(key, now) {
+  if (key === hk(now).key) return "Today";
+  if (key === hk(now + DAY).key) return "Tomorrow";
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
+}
+const range = (w, now) => `${when(w.start, now)}–${hk(w.end).hm}`;
+function chip(p, ref) { const [cls, txt] = level(p, ref); return `<span class="chip lv-${cls}">${txt}</span>`; }
+function saveRow(label, diffC, kwh) {
+  if (diffC == null) return "";
+  const eur = diffC * kwh / 100;
+  const cls = diffC >= 0 ? "pos" : "negv";
+  const txt = Math.abs(diffC) < 0.005 ? "same" : `${diffC >= 0 ? "save" : "costs"} ${money(eur)} <span class="num">(${c2(Math.abs(diffC))} c/kWh)</span>`;
+  return `<div class="row"><span>${label}</span><span class="${cls}">${txt}</span></div>`;
+}
+
+/* ===== Render ===== */
+function render() {
+  if (!last) return;
+  const { slots, sources, now } = last;
+  const A = analyse(slots, Date.now());
+  const n = Date.now();
+  const cards = [];
+
+  // Header + now
+  if (A.lastSlot) {
+    const hist = A.histDays >= 6.5 ? "7 days" : `${Math.max(0, A.histDays).toFixed(1)} days`;
+    const endHm = hk(A.lastSlot).hm === "00:00" ? "24:00" : hk(A.lastSlot).hm;
+    document.getElementById("coverage").textContent = `Prices known until ${dayName(hk(A.lastSlot - 1).key, n)} ${endHm} · week avg from ${hist} · ${sources.join(" + ") || "saved data"}`;
+  }
+  if (A.current) {
+    document.getElementById("nowPrice").textContent = c2(A.current.p);
+    document.getElementById("nowChip").innerHTML = chip(A.current.p, A.weekAvg) + (A.weekAvg != null ? ` <span class="sub">week avg <span class="num">${c2(A.weekAvg)}</span></span>` : "");
+  }
+
+  // Dishwasher
+  if (A.dish) {
+    const { best, worst, now: nw } = A.dish, k = settings.kwhDish;
+    cards.push(card("dish", "Dishwasher", "3 h 15 min", `Start ${when(best.start, n)}`,
+      `Average <span class="num">${c2(best.avg)}</span> c/kWh · ≈ ${money(best.avg * k / 100)} per run · done ${hk(best.end).hm}`,
+      saveRow(`vs starting now`, nw ? nw.avg - best.avg : null, k) +
+      saveRow(`vs worst block (${when(worst.start, n)})`, worst.avg - best.avg, k), best));
+  } else cards.push(emptyCard("dish", "Dishwasher", "3 h 15 min"));
+
+  // Laundry
+  if (A.laundry) {
+    const { best, worst, weekBest } = A.laundry, k = settings.kwhLaundry;
+    const vsWeek = weekBest ? (best.avg <= weekBest.avg + 0.005
+      ? `<div class="row"><span>Week's cheapest 1.5 h (${when(weekBest.start, n)})</span><span class="pos">this beats it</span></div>`
+      : `<div class="row"><span>Week's cheapest 1.5 h (${when(weekBest.start, n)})</span><span class="num">${c2(weekBest.avg)} c/kWh</span></div>`) : "";
+    cards.push(card("laundry", "Laundry", "1 h 30 min", `Start ${when(best.start, n)}`,
+      `Average <span class="num">${c2(best.avg)}</span> c/kWh · ≈ ${money(best.avg * k / 100)} per load · ${chip(best.avg, A.weekAvg)}`,
+      vsWeek + saveRow(`vs worst block (${when(worst.start, n)})`, worst.avg - best.avg, k), best));
+  } else cards.push(emptyCard("laundry", "Laundry", "1 h 30 min"));
+
+  // Dinner
+  if (A.dinner.length) {
+    const ev = A.dinner[0], k = settings.kwhDinner;
+    const total = (ev.best.avg + settings.extra) * k / 100;
+    const rest = A.dinner.slice(1).map(d => `<div class="row"><span>${dayName(d.key, n)}: start ${hk(d.best.start).hm}</span><span class="num">${c2(d.best.avg)} c/kWh</span></div>`).join("");
+    const week = A.dinnerWeekAvg != null ? saveRow("vs last week's evening average", A.dinnerWeekAvg - ev.best.avg, k) : "";
+    cards.push(card("dinner", "Dinner", "1 h, 17–21", `${dayName(ev.key, n)}: start ${hk(ev.best.start).hm}`,
+      `≈ ${money(total)} to cook · <span class="num">${c2(ev.best.avg)}</span> c/kWh · ${chip(ev.best.avg, A.dinnerWeekAvg ?? A.weekAvg)}`,
+      saveRow(`vs worst start (${hk(ev.worst.start).hm})`, ev.worst.avg - ev.best.avg, k) + week + rest, ev.best));
+  } else cards.push(emptyCard("dinner", "Dinner", "1 h, 17–21", "No evening slots left with known prices. Tomorrow's arrive around 14:00."));
+
+  // Charging
+  if (A.charge) {
+    const { best } = A.charge, k = settings.kwhCharge;
+    cards.push(card("charge", "Charge devices", "6 h", `${range(best, n)}`,
+      `Average <span class="num">${c2(best.avg)}</span> c/kWh · ${chip(best.avg, A.weekAvg)}`,
+      A.weekAvg != null ? saveRow("vs last week's average", A.weekAvg - best.avg, k) : "", best));
+  } else cards.push(emptyCard("charge", "Charge devices", "6 h"));
+
+  // Bad days
+  {
+    const dayRows = A.days.map(d => `<div class="day"><span>${dayName(d.key, n)} <span class="sub">avg <span class="num">${c2(d.avg)}</span> · peak <span class="num">${c2(d.max)}</span></span></span>${chip(d.avg, A.weekAvg)}</div>`).join("");
+    const w = A.worst6;
+    const head = w ? `Worst 6 h: ${range(w, n)}` : "Not enough upcoming prices";
+    const meta = w ? `Average <span class="num">${c2(w.avg)}</span> c/kWh` + (A.weekAvg != null ? ` · ${(w.avg / A.weekAvg).toFixed(1)}× the week's average` : "") : "";
+    cards.push(`<button type="button" class="card${selected === "bad" ? " sel" : ""}" data-id="bad">
+      <div class="top"><span class="label">Bad days ahead</span>${w ? chip(w.avg, A.weekAvg) : ""}</div>
+      <div class="answer">${head}</div>${meta ? `<div class="meta">${meta}</div>` : ""}
+      ${dayRows ? `<div class="rows days">${dayRows}</div>` : ""}</button>`);
+  }
+
+  document.getElementById("cards").innerHTML = cards.join("");
+  const blocks = { dish: A.dish && A.dish.best, laundry: A.laundry && A.laundry.best, dinner: A.dinner[0] && A.dinner[0].best, charge: A.charge && A.charge.best, bad: A.worst6 };
+  drawChart(A, blocks[selected], n);
+  const names = { dish: "Dishwasher", laundry: "Laundry", dinner: "Dinner", charge: "Charging", bad: "Worst 6 h" };
+  document.getElementById("chartSel").textContent = blocks[selected] ? `Highlighted: ${names[selected]} ${range(blocks[selected], n)}` : "Tap a card to highlight its time block";
+}
+
+function card(id, label, dur, answer, meta, rows, w) {
+  return `<button type="button" class="card${selected === id ? " sel" : ""}" data-id="${id}">
+    <div class="top"><span class="label">${label}</span><span class="dur">${dur}</span></div>
+    <div class="answer">${answer}</div><div class="meta">${meta}</div>
+    ${rows ? `<div class="rows">${rows}</div>` : ""}</button>`;
+}
+function emptyCard(id, label, dur, msg) {
+  return `<button type="button" class="card" data-id="${id}"><div class="top"><span class="label">${label}</span><span class="dur">${dur}</span></div>
+    <div class="empty">${msg || "Not enough upcoming prices yet. Tomorrow's arrive around 14:00."}</div></button>`;
+}
+
+function drawChart(A, block, n) {
+  const svg = document.getElementById("chart");
+  const up = A.up;
+  if (!up.length) { svg.innerHTML = ""; return; }
+  const W = 400, H = 130, padL = 26, padB = 18, padT = 6;
+  const cw = W - padL - 2, ch = H - padB - padT;
+  const t0 = up[0].t, t1 = up[up.length - 1].t + SLOT;
+  const lo = Math.min(0, ...up.map(s => s.p)), hi = Math.max(1, ...up.map(s => s.p));
+  const yMax = Math.ceil(hi / 5) * 5, yMin = lo < 0 ? Math.floor(lo) : 0;
+  const x = t => padL + (t - t0) / (t1 - t0) * cw;
+  const y = p => padT + (yMax - p) / (yMax - yMin) * ch;
+  const bw = Math.max(0.6, cw / ((t1 - t0) / SLOT) - 0.3);
+  let g = "";
+  // grid
+  const step = yMax <= 10 ? 2 : yMax <= 25 ? 5 : 10;
+  for (let v = yMin; v <= yMax; v += step) g += `<line x1="${padL}" x2="${W - 2}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="0.6"/><text x="${padL - 4}" y="${y(v) + 3}" font-size="8" text-anchor="end" fill="var(--muted)" font-family="var(--font-num)">${v}</text>`;
+  if (block) g += `<rect x="${x(block.start)}" y="${padT}" width="${x(block.end) - x(block.start)}" height="${ch}" fill="var(--accent-soft)"/>`;
+  for (const s of up) {
+    const [cls] = level(s.p, A.weekAvg);
+    const col = { good: "var(--good)", mid: "var(--muted)", warn: "var(--warn)", bad: "var(--bad)" }[cls];
+    const inB = block && s.t >= block.start && s.t < block.end;
+    const top = Math.min(y(s.p), y(0)), h = Math.max(0.5, Math.abs(y(s.p) - y(0)));
+    g += `<rect x="${x(s.t)}" y="${top}" width="${bw}" height="${h}" fill="${inB ? "var(--accent)" : col}" opacity="${inB ? 1 : 0.75}"/>`;
+  }
+  // hour labels every 6h on Helsinki time, plus day changes
+  for (let t = Math.ceil(t0 / (60 * 60 * 1000)) * 60 * 60 * 1000; t < t1; t += 60 * 60 * 1000) {
+    const a = hk(t);
+    if (a.h % 6 !== 0) continue;
+    const lab = a.h === 0 ? (a.key === hk(n + DAY).key ? "Tmrw" : a.wd) : `${String(a.h).padStart(2, "0")}`;
+    g += `<line x1="${x(t)}" x2="${x(t)}" y1="${padT + ch}" y2="${padT + ch + 3}" stroke="var(--muted)" stroke-width="0.6"/>`;
+    g += `<text x="${x(t)}" y="${H - 5}" font-size="8" text-anchor="middle" fill="var(--muted)" font-family="var(--font-num)"${a.h === 0 ? ' font-weight="600"' : ""}>${lab}</text>`;
+  }
+  g += `<line x1="${x(A.nowSlot)}" x2="${x(A.nowSlot)}" y1="${padT}" y2="${padT + ch}" stroke="var(--fg)" stroke-width="0.8" stroke-dasharray="2 2"/>`;
+  svg.innerHTML = g;
+}
+
+/* ===== Wiring ===== */
+async function refresh() {
+  const err = document.getElementById("error");
+  const btn = document.getElementById("refresh");
+  btn.textContent = "Loading…"; btn.disabled = true;
+  try {
+    const res = await load();
+    if (!res.slots.length) { const e = new Error("no data"); e.errors = res.errors; throw e; }
+    last = res; err.hidden = true;
+    if (!res.sources.length) { err.hidden = false; showError(err, "Couldn't reach the price services, so these are the last saved prices. Check your connection and tap Refresh.", res.errors); }
+    render();
+  } catch (e) {
+    err.hidden = false;
+    showError(err, "Couldn't load prices from Elering or Pörssisähkö.net. Check your connection and tap Refresh.", e.errors || [`Page: ${describe(e)}`]);
+  } finally { btn.textContent = "Refresh"; btn.disabled = false; }
+}
+function showError(box, msg, errors) {
+  box.textContent = "";
+  const p = document.createElement("div"); p.textContent = msg;
+  const d = document.createElement("div"); d.className = "detail num"; d.textContent = "Details: " + diagnostics(errors);
+  box.append(p, d);
+}
+
+function initSettings() {
+  settings = { ...DEFAULTS, ...(recall(SET_KEY) || {}) };
+  for (const k of Object.keys(DEFAULTS)) {
+    const el = document.getElementById(k);
+    el.value = settings[k];
+    el.addEventListener("input", () => {
+      const v = parseFloat(el.value);
+      if (!isNaN(v) && v >= 0) { settings[k] = v; store(SET_KEY, settings); render(); }
+    });
+  }
+}
+
+document.getElementById("cards").addEventListener("click", e => {
+  const c = e.target.closest(".card"); if (!c) return;
+  selected = c.dataset.id; render();
+});
+document.getElementById("refresh").addEventListener("click", refresh);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+setInterval(() => { if (!document.hidden) refresh(); }, 15 * 60 * 1000);
+setInterval(() => { if (!document.hidden) render(); }, 60 * 1000);
+
+initSettings();
+const cachedOnly = recall(CACHE_KEY);
+if (cachedOnly && cachedOnly.length) { last = { slots: toSlots(new Map(cachedOnly)), sources: [], now: Date.now() }; render(); }
+refresh();
+</script>
+</body>
+</html>
