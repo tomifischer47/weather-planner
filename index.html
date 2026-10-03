@@ -33,6 +33,7 @@
   --good:#5cc78f; --good-soft:#163527; --warn:#e8ae55; --warn-soft:#3a2d16; --bad:#f07a7a; --bad-soft:#3d1c1e;
   color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg)}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font-ui);-webkit-text-size-adjust:100%}
 main{max-width:560px;margin:0 auto;padding:16px 16px 40px;display:flex;flex-direction:column;gap:14px}
@@ -42,7 +43,7 @@ h1{font-size:1.05rem;font-weight:700;margin:0;letter-spacing:.01em}
 .sub{color:var(--muted);font-size:.82rem}
 button{font:inherit;color:inherit}
 .refresh{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:.85rem;cursor:pointer}
-.refresh:focus-visible,.card:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.refresh:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .now{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .now .big{font-size:2.3rem;font-weight:600;line-height:1}
@@ -75,11 +76,6 @@ button{font:inherit;color:inherit}
 .day{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.9rem}
 .empty{color:var(--muted);font-size:.9rem}
 
-details{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 16px}
-summary{cursor:pointer;font-weight:600;font-size:.9rem;padding:2px 0}
-.settings{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;padding:10px 0 4px;font-size:.88rem}
-.settings input{width:5.5em;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit;font-family:var(--font-num);text-align:right}
-.settings .hint{grid-column:1/-1;color:var(--muted);font-size:.8rem}
 .err{background:var(--bad-soft);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:.9rem;display:flex;flex-direction:column;gap:6px}
 .err .detail{font-size:.75rem;opacity:.85;overflow-wrap:anywhere;user-select:text}
 footer{color:var(--muted);font-size:.78rem;line-height:1.5}
@@ -111,20 +107,9 @@ footer{color:var(--muted);font-size:.78rem;line-height:1.5}
 
   <section class="cards" id="cards"></section>
 
-  <details id="settingsBox">
-    <summary>Settings</summary>
-    <div class="settings">
-      <label for="kwhDish">Dishwasher, kWh per run</label><input id="kwhDish" type="number" step="0.1" min="0">
-      <label for="kwhLaundry">Laundry, kWh per load</label><input id="kwhLaundry" type="number" step="0.1" min="0">
-      <label for="kwhDinner">Dinner, kWh for 1 h of cooking</label><input id="kwhDinner" type="number" step="0.1" min="0">
-      <label for="kwhCharge">Charging, kWh over 6 h</label><input id="kwhCharge" type="number" step="0.1" min="0">
-      <label for="extra">Extras on top of spot, c/kWh</label><input id="extra" type="number" step="0.1" min="0">
-      <p class="hint">Extras are your retailer margin, Helen transfer fee and electricity tax. They raise what dinner costs but don't change any of the savings, since they're the same at every hour.</p>
-    </div>
-  </details>
 
   <footer>
-    Spot prices for the Finland bidding zone in 15-minute steps, shown with 25.5 % VAT. Upcoming prices from spot-hinta.fi; the past week's prices (hourly) from sahkotin.fi. Both republish Nord Pool day-ahead prices. Tomorrow's prices usually appear around 14:00.
+    Spot prices for the Finland bidding zone in 15-minute steps, shown with 25.5 % VAT. Upcoming prices from spot-hinta.fi; the past week's prices (hourly) from sahkotin.fi. Both republish Nord Pool day-ahead prices. Tomorrow's prices usually appear around 14:00. Costs are the spot price only; your retailer margin, transfer fee and tax come on top but are the same at every hour, so the savings are unaffected.
   </footer>
 </main>
 
@@ -148,13 +133,32 @@ function hk(t) {
 // Turn a map of ts->price into a sorted array of 15-min slots
 function toSlots(map) { return [...map.entries()].map(([t, p]) => ({ t: +t, p })).sort((a, b) => a.t - b.t); }
 
-// All contiguous windows of n slots: [{start, end, avg}]
-function windows(slots, n) {
+// ===== Your appliances (hardcoded) =====
+// Each profile is kWh drawn in each 15-minute slot of the run, so heating-heavy slots count more.
+const PROFILE = (total, weights) => { const s = weights.reduce((a, b) => a + b, 0); return weights.map(w => total * w / s); };
+const APPLIANCES = {
+  // Siemens iQ100 SR415W00CS, Eco 50: 0.78 kWh over 195 min (official figures).
+  // Water heating for the main wash early on and for the hot final rinse later carries most of the energy.
+  dish: PROFILE(0.78, [0.02, 0.17, 0.17, 0.05, 0.02, 0.02, 0.02, 0.15, 0.15, 0.02, 0.01, 0.01, 0.01]),
+  // Hoover VisionHD 6 kg at 40 °C: estimated 0.6 kWh (Hoover lists about 1.0 kWh for the 60 °C standard wash).
+  // Water is heated in the first half hour; the rest is drum, pump and final spin.
+  laundry: PROFILE(0.6, [0.40, 0.40, 0.04, 0.04, 0.04, 0.08]),
+  // Worst-case dinner: hob's two largest zones (2.2 kW + 2.0 kW) on full for 1 h = 4.2 kWh,
+  // plus the HB510AB.0S oven for a full hour including preheat, about 1.2 kWh (0.97 kWh per standard cycle).
+  dinner: [1.05 + 0.45, 1.05 + 0.25, 1.05 + 0.25, 1.05 + 0.25],
+};
+const kwhOf = prof => prof.reduce((a, b) => a + b, 0);
+
+// All contiguous windows of n slots: [{start, end, avg, cost}]
+// With a profile, cost is € for that run and avg is the energy-weighted c/kWh.
+function windows(slots, n, profile) {
   const out = [];
+  const w = profile || Array(n).fill(1);
+  const tot = kwhOf(w);
   for (let i = 0; i + n <= slots.length; i++) {
     if (slots[i + n - 1].t - slots[i].t !== (n - 1) * SLOT) continue;
-    let s = 0; for (let j = i; j < i + n; j++) s += slots[j].p;
-    out.push({ start: slots[i].t, end: slots[i].t + n * SLOT, avg: s / n });
+    let s = 0; for (let j = 0; j < n; j++) s += slots[i + j].p * w[j];
+    out.push({ start: slots[i].t, end: slots[i].t + n * SLOT, avg: s / tot, cost: profile ? s / 100 : null });
   }
   return out;
 }
@@ -169,42 +173,52 @@ function analyse(allSlots, now) {
   const weekAvg = mean(hist.map(s => s.p));
   const current = allSlots.find(s => s.t === nowSlot) || null;
 
-  // Dishwasher: 3h15m = 13 slots
-  const w13 = windows(up, 13);
-  const dish = w13.length ? {
-    best: minBy(w13, w => w.avg), worst: maxBy(w13, w => w.avg),
-    now: w13.find(w => w.start === nowSlot) || null,
+  // Dishwasher: Eco 50, 3h15m = 13 slots
+  const wDish = windows(up, 13, APPLIANCES.dish);
+  const dish = wDish.length ? {
+    best: minBy(wDish, w => w.cost), worst: maxBy(wDish, w => w.cost),
+    now: wDish.find(w => w.start === nowSlot) || null,
   } : null;
 
-  // Laundry: 1h30m = 6 slots; compare with cheapest 1.5h block in the past week
-  const w6 = windows(up, 6);
-  const w6hist = windows(hist, 6);
-  const laundry = w6.length ? {
-    best: minBy(w6, w => w.avg), worst: maxBy(w6, w => w.avg),
-    weekBest: minBy(w6hist, w => w.avg),
+  // Laundry: 40 °C, 1h30m = 6 slots; compare with cheapest run in the past week
+  const wLaundry = windows(up, 6, APPLIANCES.laundry);
+  const wLaundryHist = windows(hist, 6, APPLIANCES.laundry);
+  const laundry = wLaundry.length ? {
+    best: minBy(wLaundry, w => w.cost), worst: maxBy(wLaundry, w => w.cost),
+    weekBest: minBy(wLaundryHist, w => w.cost),
   } : null;
 
-  // Dinner: 1h blocks starting 17:00–20:00 Helsinki time, per evening
-  const w4 = windows(up, 4).filter(w => { const a = hk(w.start); const mins = a.h * 60 + a.m; return mins >= 17 * 60 && mins <= 20 * 60; });
+  // Dinner: 1h starting 17:00–20:00 Helsinki time, per evening
+  const inEvening = w => { const a = hk(w.start); const mins = a.h * 60 + a.m; return mins >= 17 * 60 && mins <= 20 * 60; };
+  const wDinner = windows(up, 4, APPLIANCES.dinner).filter(inEvening);
   const evenings = {};
-  for (const w of w4) { const k = hk(w.start).key; (evenings[k] = evenings[k] || []).push(w); }
-  const dinner = Object.keys(evenings).sort().map(k => ({ key: k, best: minBy(evenings[k], w => w.avg), worst: maxBy(evenings[k], w => w.avg) }));
-  const histEvening = hist.filter(s => { const a = hk(s.t); return a.h >= 17 && a.h < 21; });
-  const dinnerWeekAvg = mean(histEvening.map(s => s.p));
+  for (const w of wDinner) { const k = hk(w.start).key; (evenings[k] = evenings[k] || []).push(w); }
+  const dinner = Object.keys(evenings).sort().map(k => ({ key: k, best: minBy(evenings[k], w => w.cost), worst: maxBy(evenings[k], w => w.cost) }));
+  const histDinners = windows(hist, 4, APPLIANCES.dinner).filter(inEvening);
+  const dinnerWeekAvgCost = mean(histDinners.map(w => w.cost));
+  const dinnerWeekAvg = mean(histDinners.map(w => w.avg));
 
-  // Charging: 6h = 24 slots
-  const w24 = windows(up, 24);
-  const charge = w24.length ? { best: minBy(w24, w => w.avg) } : null;
+  // Charging: the night 00:00–08:00 (the current one before 08:00, otherwise the next one)
+  const nowA = hk(now);
+  const nightKey = nowA.h < 8 ? nowA.key : hk(now + DAY).key;
+  const nightSlots = allSlots.filter(s => { const a = hk(s.t); return a.key === nightKey && a.h < 8; });
+  const nightDone = nightSlots.length && hk(nightSlots[nightSlots.length - 1].t).hm === "07:45" && hk(nightSlots[0].t).hm === "00:00";
+  const charge = nightDone ? {
+    start: nightSlots[0].t, end: nightSlots[nightSlots.length - 1].t + SLOT,
+    avg: mean(nightSlots.map(s => s.p)),
+    weekNightAvg: mean(hist.filter(s => hk(s.t).h < 8).map(s => s.p)),
+  } : null;
 
-  // Bad days: most expensive 6h block, plus per-day averages
-  const worst6 = w24.length ? maxBy(w24, w => w.avg) : null;
+  // Bad days: most expensive 8h block, plus per-day averages
+  const w32 = windows(up, 32);
+  const worst8 = w32.length ? maxBy(w32, w => w.avg) : null;
   const byDay = {};
   for (const s of allSlots) { if (s.t < nowSlot - DAY) continue; const k = hk(s.t).key; (byDay[k] = byDay[k] || []).push(s.p); }
   const todayKey = hk(now).key;
   const days = Object.keys(byDay).sort().filter(k => k >= todayKey && byDay[k].length >= 88)
     .map(k => ({ key: k, avg: mean(byDay[k]), max: Math.max(...byDay[k]) }));
 
-  return { nowSlot, up, hist, weekAvg, current, dish, laundry, dinner, dinnerWeekAvg, charge, worst6, days,
+  return { nowSlot, up, hist, weekAvg, current, dish, laundry, dinner, dinnerWeekAvg, dinnerWeekAvgCost, charge, worst8, days,
            histDays: hist.length / 96, lastSlot: allSlots.length ? allSlots[allSlots.length - 1].t + SLOT : null };
 }
 
@@ -222,14 +236,12 @@ function level(p, ref) {
   if (p < 15) return ["warn", "High"];
   return ["bad", "Very high"];
 }
-if (typeof module !== "undefined") module.exports = { SLOT, DAY, eurMwhToCents, hk, toSlots, windows, analyse, level };
+if (typeof module !== "undefined") module.exports = { SLOT, DAY, eurMwhToCents, hk, toSlots, windows, analyse, level, APPLIANCES };
 </script>
 
 <script>
 /* ===== Data loading ===== */
-const CACHE_KEY = "hsp-prices-v2", SET_KEY = "hsp-settings-v1";
-const DEFAULTS = { kwhDish: 1.0, kwhLaundry: 1.0, kwhDinner: 2.0, kwhCharge: 3.0, extra: 0 };
-let settings = { ...DEFAULTS };
+const CACHE_KEY = "hsp-prices-v2";
 let selected = "dish";
 let last = null;
 
@@ -316,20 +328,20 @@ function dayName(key, now) {
 }
 const range = (w, now) => `${when(w.start, now)}–${hk(w.end).hm}`;
 function chip(p, ref) { const [cls, txt] = level(p, ref); return `<span class="chip lv-${cls}">${txt}</span>`; }
-function saveRow(label, diffC, kwh) {
-  if (diffC == null) return "";
-  const eur = diffC * kwh / 100;
-  const cls = diffC >= 0 ? "pos" : "negv";
-  const txt = Math.abs(diffC) < 0.005 ? "same" : `${diffC >= 0 ? "save" : "costs"} ${money(eur)} <span class="num">(${c2(Math.abs(diffC))} c/kWh)</span>`;
+function costRow(label, eurDiff) {
+  if (eurDiff == null) return "";
+  const cls = eurDiff >= 0 ? "pos" : "negv";
+  const txt = Math.abs(eurDiff) < 0.0005 ? "same" : `${eurDiff >= 0 ? "save" : "costs"} ${money(Math.abs(eurDiff))}`;
   return `<div class="row"><span>${label}</span><span class="${cls}">${txt}</span></div>`;
 }
+const fmtKwh = prof => kwhOf(prof).toFixed(kwhOf(prof) < 1 ? 2 : 1);
 
 /* ===== Render ===== */
 function render() {
   if (!last) return;
-  const { slots, sources, now } = last;
-  const A = analyse(slots, Date.now());
+  const { slots, sources } = last;
   const n = Date.now();
+  const A = analyse(slots, n);
   const cards = [];
 
   // Header + now
@@ -345,48 +357,48 @@ function render() {
 
   // Dishwasher
   if (A.dish) {
-    const { best, worst, now: nw } = A.dish, k = settings.kwhDish;
-    cards.push(card("dish", "Dishwasher", "3 h 15 min", `Start ${when(best.start, n)}`,
-      `Average <span class="num">${c2(best.avg)}</span> c/kWh · ≈ ${money(best.avg * k / 100)} per run · done ${hk(best.end).hm}`,
-      saveRow(`vs starting now`, nw ? nw.avg - best.avg : null, k) +
-      saveRow(`vs worst block (${when(worst.start, n)})`, worst.avg - best.avg, k), best));
-  } else cards.push(emptyCard("dish", "Dishwasher", "3 h 15 min"));
+    const { best, worst, now: nw } = A.dish;
+    cards.push(card("dish", "Dishwasher", "Eco 50 · 3 h 15 min", `Start ${when(best.start, n)}`,
+      `≈ ${money(best.cost)} per run (${fmtKwh(APPLIANCES.dish)} kWh) · done ${hk(best.end).hm}`,
+      costRow("vs starting now", nw ? nw.cost - best.cost : null) +
+      costRow(`vs worst start (${when(worst.start, n)})`, worst.cost - best.cost), best));
+  } else cards.push(emptyCard("dish", "Dishwasher", "Eco 50 · 3 h 15 min"));
 
   // Laundry
   if (A.laundry) {
-    const { best, worst, weekBest } = A.laundry, k = settings.kwhLaundry;
-    const vsWeek = weekBest ? (best.avg <= weekBest.avg + 0.005
-      ? `<div class="row"><span>Week's cheapest 1.5 h (${when(weekBest.start, n)})</span><span class="pos">this beats it</span></div>`
-      : `<div class="row"><span>Week's cheapest 1.5 h (${when(weekBest.start, n)})</span><span class="num">${c2(weekBest.avg)} c/kWh</span></div>`) : "";
-    cards.push(card("laundry", "Laundry", "1 h 30 min", `Start ${when(best.start, n)}`,
-      `Average <span class="num">${c2(best.avg)}</span> c/kWh · ≈ ${money(best.avg * k / 100)} per load · ${chip(best.avg, A.weekAvg)}`,
-      vsWeek + saveRow(`vs worst block (${when(worst.start, n)})`, worst.avg - best.avg, k), best));
-  } else cards.push(emptyCard("laundry", "Laundry", "1 h 30 min"));
+    const { best, worst, weekBest } = A.laundry;
+    const vsWeek = weekBest ? (best.cost <= weekBest.cost + 0.0005
+      ? `<div class="row"><span>Week's cheapest wash (${when(weekBest.start, n)}, ${money(weekBest.cost)})</span><span class="pos">this beats it</span></div>`
+      : `<div class="row"><span>Week's cheapest wash (${when(weekBest.start, n)})</span><span>${money(weekBest.cost)}, ${money(best.cost - weekBest.cost)} less</span></div>`) : "";
+    cards.push(card("laundry", "Laundry", "40 °C · 1 h 30 min", `Start ${when(best.start, n)}`,
+      `≈ ${money(best.cost)} per load (${fmtKwh(APPLIANCES.laundry)} kWh) · ${chip(best.avg, A.weekAvg)}`,
+      vsWeek + costRow(`vs worst start (${when(worst.start, n)})`, worst.cost - best.cost), best));
+  } else cards.push(emptyCard("laundry", "Laundry", "40 °C · 1 h 30 min"));
 
   // Dinner
   if (A.dinner.length) {
-    const ev = A.dinner[0], k = settings.kwhDinner;
-    const total = (ev.best.avg + settings.extra) * k / 100;
-    const rest = A.dinner.slice(1).map(d => `<div class="row"><span>${dayName(d.key, n)}: start ${hk(d.best.start).hm}</span><span class="num">${c2(d.best.avg)} c/kWh</span></div>`).join("");
-    const week = A.dinnerWeekAvg != null ? saveRow("vs last week's evening average", A.dinnerWeekAvg - ev.best.avg, k) : "";
-    cards.push(card("dinner", "Dinner", "1 h, 17–21", `${dayName(ev.key, n)}: start ${hk(ev.best.start).hm}`,
-      `≈ ${money(total)} to cook · <span class="num">${c2(ev.best.avg)}</span> c/kWh · ${chip(ev.best.avg, A.dinnerWeekAvg ?? A.weekAvg)}`,
-      saveRow(`vs worst start (${hk(ev.worst.start).hm})`, ev.worst.avg - ev.best.avg, k) + week + rest, ev.best));
-  } else cards.push(emptyCard("dinner", "Dinner", "1 h, 17–21", "No evening slots left with known prices. Tomorrow's arrive around 14:00."));
+    const ev = A.dinner[0];
+    const rest = A.dinner.slice(1).map(d => `<div class="row"><span>${dayName(d.key, n)}: start ${hk(d.best.start).hm}</span><span class="num">${money(d.best.cost)}</span></div>`).join("");
+    const week = A.dinnerWeekAvgCost != null ? costRow("vs last week's average dinner", A.dinnerWeekAvgCost - ev.best.cost) : "";
+    cards.push(card("dinner", "Dinner", "Hob + oven · 1 h, 17–21", `${dayName(ev.key, n)}: start ${hk(ev.best.start).hm}`,
+      `≈ ${money(ev.best.cost)} at most (${fmtKwh(APPLIANCES.dinner)} kWh) · ${chip(ev.best.avg, A.dinnerWeekAvg ?? A.weekAvg)}`,
+      costRow(`vs worst start (${hk(ev.worst.start).hm})`, ev.worst.cost - ev.best.cost) + week + rest, ev.best));
+  } else cards.push(emptyCard("dinner", "Dinner", "Hob + oven · 1 h, 17–21", "No evening slots left with known prices. Tomorrow's arrive around 14:00."));
 
-  // Charging
+  // Charging overnight
   if (A.charge) {
-    const { best } = A.charge, k = settings.kwhCharge;
-    cards.push(card("charge", "Charge devices", "6 h", `${range(best, n)}`,
-      `Average <span class="num">${c2(best.avg)}</span> c/kWh · ${chip(best.avg, A.weekAvg)}`,
-      A.weekAvg != null ? saveRow("vs last week's average", A.weekAvg - best.avg, k) : "", best));
-  } else cards.push(emptyCard("charge", "Charge devices", "6 h"));
+    const c = A.charge;
+    const night = hk(c.start).key === hk(n).key ? "Tonight (now)" : (hk(c.start).key === hk(n + DAY).key ? "Tonight" : dayName(hk(c.start).key, n) + " night");
+    const vs = c.weekNightAvg != null ? `<div class="row"><span>Last week's nights</span><span class="num">${c2(c.weekNightAvg)} c/kWh</span></div>` : "";
+    cards.push(card("charge", "Charge overnight", "00–08", `${night}: ${c2(c.avg)} c/kWh`,
+      `Average for 00:00–08:00 · ${chip(c.avg, c.weekNightAvg ?? A.weekAvg)}`, vs, c));
+  } else cards.push(emptyCard("charge", "Charge overnight", "00–08", "Tonight's prices aren't published yet. They arrive around 14:00."));
 
   // Bad days
   {
     const dayRows = A.days.map(d => `<div class="day"><span>${dayName(d.key, n)} <span class="sub">avg <span class="num">${c2(d.avg)}</span> · peak <span class="num">${c2(d.max)}</span></span></span>${chip(d.avg, A.weekAvg)}</div>`).join("");
-    const w = A.worst6;
-    const head = w ? `Worst 6 h: ${range(w, n)}` : "Not enough upcoming prices";
+    const w = A.worst8;
+    const head = w ? `Worst 8 h: ${range(w, n)}` : "Not enough upcoming prices";
     const meta = w ? `Average <span class="num">${c2(w.avg)}</span> c/kWh` + (A.weekAvg != null ? ` · ${(w.avg / A.weekAvg).toFixed(1)}× the week's average` : "") : "";
     cards.push(`<button type="button" class="card${selected === "bad" ? " sel" : ""}" data-id="bad">
       <div class="top"><span class="label">Bad days ahead</span>${w ? chip(w.avg, A.weekAvg) : ""}</div>
@@ -395,9 +407,9 @@ function render() {
   }
 
   document.getElementById("cards").innerHTML = cards.join("");
-  const blocks = { dish: A.dish && A.dish.best, laundry: A.laundry && A.laundry.best, dinner: A.dinner[0] && A.dinner[0].best, charge: A.charge && A.charge.best, bad: A.worst6 };
+  const blocks = { dish: A.dish && A.dish.best, laundry: A.laundry && A.laundry.best, dinner: A.dinner[0] && A.dinner[0].best, charge: A.charge, bad: A.worst8 };
   drawChart(A, blocks[selected], n);
-  const names = { dish: "Dishwasher", laundry: "Laundry", dinner: "Dinner", charge: "Charging", bad: "Worst 6 h" };
+  const names = { dish: "Dishwasher", laundry: "Laundry", dinner: "Dinner", charge: "Overnight charging", bad: "Worst 8 h" };
   document.getElementById("chartSel").textContent = blocks[selected] ? `Highlighted: ${names[selected]} ${range(blocks[selected], n)}` : "Tap a card to highlight its time block";
 }
 
@@ -428,7 +440,7 @@ function drawChart(A, block, n) {
   // grid
   const step = yMax <= 10 ? 2 : yMax <= 25 ? 5 : 10;
   for (let v = yMin; v <= yMax; v += step) g += `<line x1="${padL}" x2="${W - 2}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="0.6"/><text x="${padL - 4}" y="${y(v) + 3}" font-size="8" text-anchor="end" fill="var(--muted)" font-family="var(--font-num)">${v}</text>`;
-  if (block) g += `<rect x="${x(block.start)}" y="${padT}" width="${x(block.end) - x(block.start)}" height="${ch}" fill="var(--accent-soft)"/>`;
+  if (block && block.end > t0) { const bs = Math.max(block.start, t0), be = Math.min(block.end, t1); g += `<rect x="${x(bs)}" y="${padT}" width="${x(be) - x(bs)}" height="${ch}" fill="var(--accent-soft)"/>`; }
   for (const s of up) {
     const [cls] = level(s.p, A.weekAvg);
     const col = { good: "var(--good)", mid: "var(--muted)", warn: "var(--warn)", bad: "var(--bad)" }[cls];
@@ -471,17 +483,6 @@ function showError(box, msg, errors) {
   box.append(p, d);
 }
 
-function initSettings() {
-  settings = { ...DEFAULTS, ...(recall(SET_KEY) || {}) };
-  for (const k of Object.keys(DEFAULTS)) {
-    const el = document.getElementById(k);
-    el.value = settings[k];
-    el.addEventListener("input", () => {
-      const v = parseFloat(el.value);
-      if (!isNaN(v) && v >= 0) { settings[k] = v; store(SET_KEY, settings); render(); }
-    });
-  }
-}
 
 document.getElementById("cards").addEventListener("click", e => {
   const c = e.target.closest(".card"); if (!c) return;
@@ -492,7 +493,6 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) refr
 setInterval(() => { if (!document.hidden) refresh(); }, 15 * 60 * 1000);
 setInterval(() => { if (!document.hidden) render(); }, 60 * 1000);
 
-initSettings();
 const cachedOnly = recall(CACHE_KEY);
 if (cachedOnly && cachedOnly.length) { last = { slots: toSlots(new Map(cachedOnly)), sources: [], now: Date.now() }; render(); }
 refresh();
