@@ -13,72 +13,64 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one narrow column of answer cards under a "now" strip and a price chart; phone first. */
+/* Layout: current price, a status list of five decisions (colored icon + verdict), then the price chart. */
 :root{
-  --bg:#f3f5f7; --surface:#ffffff; --fg:#17202a; --muted:#5d6a78; --line:#dde3ea;
+  --bg:#f3f5f7; --surface:#ffffff; --fg:#17202a; --muted:#5d6a78; --line:#e1e6ec;
   --accent:#1f5fbf; --accent-soft:#e3ecfa;
-  --good:#1d7a4c; --good-soft:#dff2e8; --warn:#a2620a; --warn-soft:#fbefd9; --bad:#b42a2a; --bad-soft:#f9e1e1;
+  --good:#1d7a4c; --good-soft:#dcf1e5; --warn:#a2620a; --warn-soft:#fbedd5; --bad:#b42a2a; --bad-soft:#f9e0e0; --none-soft:#eceff3;
   --font-ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-num:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#11161c; --surface:#19212a; --fg:#e6ebf0; --muted:#93a1b0; --line:#2a3440;
+  --bg:#11161c; --surface:#19212a; --fg:#e6ebf0; --muted:#93a1b0; --line:#28323d;
   --accent:#7aa8f0; --accent-soft:#1d2d47;
-  --good:#5cc78f; --good-soft:#163527; --warn:#e8ae55; --warn-soft:#3a2d16; --bad:#f07a7a; --bad-soft:#3d1c1e;
+  --good:#5cc78f; --good-soft:#163527; --warn:#e8ae55; --warn-soft:#3a2d16; --bad:#f07a7a; --bad-soft:#3d1c1e; --none-soft:#222b35;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#11161c; --surface:#19212a; --fg:#e6ebf0; --muted:#93a1b0; --line:#2a3440;
+  --bg:#11161c; --surface:#19212a; --fg:#e6ebf0; --muted:#93a1b0; --line:#28323d;
   --accent:#7aa8f0; --accent-soft:#1d2d47;
-  --good:#5cc78f; --good-soft:#163527; --warn:#e8ae55; --warn-soft:#3a2d16; --bad:#f07a7a; --bad-soft:#3d1c1e;
+  --good:#5cc78f; --good-soft:#163527; --warn:#e8ae55; --warn-soft:#3a2d16; --bad:#f07a7a; --bad-soft:#3d1c1e; --none-soft:#222b35;
   color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg)}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font-ui);-webkit-text-size-adjust:100%}
-main{max-width:560px;margin:0 auto;padding:16px 16px 40px;display:flex;flex-direction:column;gap:14px}
+main{max-width:560px;margin:0 auto;padding:16px 16px 40px;display:flex;flex-direction:column;gap:16px}
 .num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px}
 h1{font-size:1.05rem;font-weight:700;margin:0;letter-spacing:.01em}
-.sub{color:var(--muted);font-size:.82rem}
 button{font:inherit;color:inherit}
 .refresh{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:.85rem;cursor:pointer}
-.refresh:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.refresh:focus-visible,.item:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 
-.now{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.now{display:flex;align-items:center;gap:10px}
+.now .dot{width:12px;height:12px;border-radius:50%;background:var(--muted)}
 .now .big{font-size:2.3rem;font-weight:600;line-height:1}
-.now .unit{color:var(--muted);font-size:.9rem}
-.chip{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
-.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
-.lv-good{color:var(--good);background:var(--good-soft)}
-.lv-mid{color:var(--muted);background:var(--line)}
-.lv-warn{color:var(--warn);background:var(--warn-soft)}
-.lv-bad{color:var(--bad);background:var(--bad-soft)}
+.now .unit{color:var(--muted);font-size:.9rem;align-self:flex-end;padding-bottom:3px}
+.now.st-good .dot{background:var(--good)} .now.st-bad .dot{background:var(--bad)}
 
-.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 10px 4px}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.item{display:flex;align-items:center;gap:14px;width:100%;padding:13px 16px;background:none;border:0;text-align:left;cursor:pointer}
+.item + .item{border-top:1px solid var(--line)}
+.item.sel{background:var(--accent-soft)}
+.ic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--none-soft);color:var(--muted)}
+.ic svg{width:22px;height:22px}
+.st-good .ic{background:var(--good-soft);color:var(--good)}
+.st-warn .ic{background:var(--warn-soft);color:var(--warn)}
+.st-bad .ic{background:var(--bad-soft);color:var(--bad)}
+.txt{display:flex;flex-direction:column;min-width:0}
+.name{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.verdict{font-size:1.05rem;font-weight:600;line-height:1.3}
+.detail{font-size:.84rem;color:var(--muted)}
+
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 10px 4px}
 .chart svg{display:block;width:100%;height:auto}
 .chart .legend{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:.75rem;padding:4px 2px 2px;flex-wrap:wrap}
 
-.cards{display:flex;flex-direction:column;gap:10px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;text-align:left;width:100%}
-.card.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.card .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.card .label{font-size:.74rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.card .dur{font-size:.78rem;color:var(--muted)}
-.card .answer{font-size:1.35rem;font-weight:600;line-height:1.2;text-wrap:balance}
-.card .meta{color:var(--muted);font-size:.86rem}
-.rows{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:8px}
-.row{display:flex;justify-content:space-between;gap:12px;font-size:.86rem}
-.row span:first-child{color:var(--muted);min-width:0}
-.row span:last-child{text-align:right;white-space:nowrap}
-.pos{color:var(--good)} .negv{color:var(--bad)}
-.days{display:flex;flex-direction:column;gap:6px}
-.day{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.9rem}
-.empty{color:var(--muted);font-size:.9rem}
-
 .err{background:var(--bad-soft);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:.9rem;display:flex;flex-direction:column;gap:6px}
-.err .detail{font-size:.75rem;opacity:.85;overflow-wrap:anywhere;user-select:text}
-@media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s,box-shadow .15s}}
+.err .detail{color:var(--bad);font-size:.75rem;opacity:.85;overflow-wrap:anywhere;user-select:text}
+@media (prefers-reduced-motion:no-preference){.item{transition:background-color .15s}}
 </style>
 </head>
 <body>
@@ -90,20 +82,18 @@ button{font:inherit;color:inherit}
 
   <div id="error" class="err" hidden></div>
 
-  <section class="now" aria-live="polite">
+  <section class="now" id="now" aria-live="polite">
+    <span class="dot"></span>
     <span class="big num" id="nowPrice">–</span>
     <span class="unit">c/kWh now</span>
-    <span id="nowChip"></span>
   </section>
+
+  <section class="list" id="list"></section>
 
   <section class="chart" aria-label="Upcoming prices">
     <svg id="chart" viewBox="0 0 400 130" role="img" aria-label="Bar chart of upcoming 15-minute prices"></svg>
-    <div class="legend"><span id="chartSel">Tap a card to highlight its time block</span><span>c/kWh</span></div>
+    <div class="legend"><span id="chartSel"></span><span>dashed line: 15 c/kWh</span></div>
   </section>
-
-  <section class="cards" id="cards"></section>
-
-
 </main>
 
 <script id="logic">
@@ -112,6 +102,10 @@ const SLOT = 15 * 60 * 1000;
 const DAY = 24 * 60 * 60 * 1000;
 const VAT = 1.255;
 const TZ = "Europe/Helsinki";
+
+// Your rules
+const LIMIT = 15;        // c/kWh: the price you try to stay under
+const WAIT_MIN = 0.05;   // €: waiting has to save at least this much to be worth it
 
 // €/MWh excl. VAT -> c/kWh incl. VAT (no VAT on negative prices)
 function eurMwhToCents(p) { const c = p / 10; return c > 0 ? c * VAT : c; }
@@ -122,28 +116,22 @@ function hk(t) {
   for (const p of _fmtParts.formatToParts(new Date(t))) o[p.type] = p.value;
   return { key: `${o.year}-${o.month}-${o.day}`, h: +o.hour, m: +o.minute, wd: o.weekday, hm: `${o.hour}:${o.minute}` };
 }
-
-// Turn a map of ts->price into a sorted array of 15-min slots
 function toSlots(map) { return [...map.entries()].map(([t, p]) => ({ t: +t, p })).sort((a, b) => a.t - b.t); }
 
-// ===== Your appliances (hardcoded) =====
+// ===== Your appliances =====
 // Each profile is kWh drawn in each 15-minute slot of the run, so heating-heavy slots count more.
 const PROFILE = (total, weights) => { const s = weights.reduce((a, b) => a + b, 0); return weights.map(w => total * w / s); };
 const APPLIANCES = {
   // Siemens iQ100 SR415W00CS, Eco 50: 0.78 kWh over 195 min (official figures).
-  // Water heating for the main wash early on and for the hot final rinse later carries most of the energy.
   dish: PROFILE(0.78, [0.02, 0.17, 0.17, 0.05, 0.02, 0.02, 0.02, 0.15, 0.15, 0.02, 0.01, 0.01, 0.01]),
-  // Hoover VisionHD 6 kg at 40 °C: estimated 0.6 kWh (Hoover lists about 1.0 kWh for the 60 °C standard wash).
-  // Water is heated in the first half hour; the rest is drum, pump and final spin.
+  // Hoover VisionHD 6 kg at 40 °C: estimated 0.6 kWh, water heated in the first half hour.
   laundry: PROFILE(0.6, [0.40, 0.40, 0.04, 0.04, 0.04, 0.08]),
-  // Worst-case dinner: hob's two largest zones (2.2 kW + 2.0 kW) on full for 1 h = 4.2 kWh,
-  // plus the HB510AB.0S oven for a full hour including preheat, about 1.2 kWh (0.97 kWh per standard cycle).
+  // Worst-case dinner: hob zones 2.2 kW + 2.0 kW on full for 1 h, plus the oven for 1 h incl. preheat (~1.2 kWh).
   dinner: [1.05 + 0.45, 1.05 + 0.25, 1.05 + 0.25, 1.05 + 0.25],
 };
 const kwhOf = prof => prof.reduce((a, b) => a + b, 0);
 
-// All contiguous windows of n slots: [{start, end, avg, cost}]
-// With a profile, cost is € for that run and avg is the energy-weighted c/kWh.
+// All contiguous windows of n slots: [{start, end, avg, cost}]; avg is energy-weighted c/kWh, cost is € per run
 function windows(slots, n, profile) {
   const out = [];
   const w = profile || Array(n).fill(1);
@@ -151,7 +139,7 @@ function windows(slots, n, profile) {
   for (let i = 0; i + n <= slots.length; i++) {
     if (slots[i + n - 1].t - slots[i].t !== (n - 1) * SLOT) continue;
     let s = 0; for (let j = 0; j < n; j++) s += slots[i + j].p * w[j];
-    out.push({ start: slots[i].t, end: slots[i].t + n * SLOT, avg: s / tot, cost: profile ? s / 100 : null });
+    out.push({ start: slots[i].t, end: slots[i].t + n * SLOT, avg: s / tot, cost: s / 100 });
   }
   return out;
 }
@@ -159,77 +147,63 @@ function minBy(arr, f) { let b = null; for (const x of arr) if (!b || f(x) < f(b
 function maxBy(arr, f) { let b = null; for (const x of arr) if (!b || f(x) > f(b)) b = x; return b; }
 function mean(xs) { return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null; }
 
+// Dishwasher / laundry: good = start now is under the limit and waiting saves too little to bother;
+// warn = a better time exists under the limit; bad = nothing under the limit in known prices.
+function flexible(up, nowSlot, n, profile) {
+  const ws = windows(up, n, profile);
+  if (!ws.length) return null;
+  const best = minBy(ws, w => w.cost);
+  const now = ws.find(w => w.start === nowSlot) || null;
+  let status;
+  if (now && now.avg < LIMIT && now.cost - best.cost < WAIT_MIN) status = "good";
+  else if (best.avg < LIMIT) status = "warn";
+  else status = "bad";
+  return { status, best, now };
+}
+
 function analyse(allSlots, now) {
   const nowSlot = Math.floor(now / SLOT) * SLOT;
   const up = allSlots.filter(s => s.t >= nowSlot);
-  const hist = allSlots.filter(s => s.t < nowSlot && s.t >= nowSlot - 7 * DAY);
-  const weekAvg = mean(hist.map(s => s.p));
   const current = allSlots.find(s => s.t === nowSlot) || null;
 
-  // Dishwasher: Eco 50, 3h15m = 13 slots
-  const wDish = windows(up, 13, APPLIANCES.dish);
-  const dish = wDish.length ? {
-    best: minBy(wDish, w => w.cost), worst: maxBy(wDish, w => w.cost),
-    now: wDish.find(w => w.start === nowSlot) || null,
-  } : null;
+  const dish = flexible(up, nowSlot, 13, APPLIANCES.dish);
+  const laundry = flexible(up, nowSlot, 6, APPLIANCES.laundry);
 
-  // Laundry: 40 °C, 1h30m = 6 slots; compare with cheapest run in the past week
-  const wLaundry = windows(up, 6, APPLIANCES.laundry);
-  const wLaundryHist = windows(hist, 6, APPLIANCES.laundry);
-  const laundry = wLaundry.length ? {
-    best: minBy(wLaundry, w => w.cost), worst: maxBy(wLaundry, w => w.cost),
-    weekBest: minBy(wLaundryHist, w => w.cost),
-  } : null;
-
-  // Dinner: 1h starting 17:00–20:00 Helsinki time, per evening
+  // Dinner: 1h starting 17:00–20:00, the first evening with prices left
   const inEvening = w => { const a = hk(w.start); const mins = a.h * 60 + a.m; return mins >= 17 * 60 && mins <= 20 * 60; };
-  const wDinner = windows(up, 4, APPLIANCES.dinner).filter(inEvening);
   const evenings = {};
-  for (const w of wDinner) { const k = hk(w.start).key; (evenings[k] = evenings[k] || []).push(w); }
-  const dinner = Object.keys(evenings).sort().map(k => ({ key: k, best: minBy(evenings[k], w => w.cost), worst: maxBy(evenings[k], w => w.cost) }));
-  const histDinners = windows(hist, 4, APPLIANCES.dinner).filter(inEvening);
-  const dinnerWeekAvgCost = mean(histDinners.map(w => w.cost));
-  const dinnerWeekAvg = mean(histDinners.map(w => w.avg));
+  for (const w of windows(up, 4, APPLIANCES.dinner).filter(inEvening)) { const k = hk(w.start).key; (evenings[k] = evenings[k] || []).push(w); }
+  const evKey = Object.keys(evenings).sort()[0];
+  const dinner = evKey ? (() => {
+    const best = minBy(evenings[evKey], w => w.cost), worst = maxBy(evenings[evKey], w => w.cost);
+    return { key: evKey, best, worst, status: best.avg < LIMIT ? "good" : "bad" };
+  })() : null;
 
-  // Charging: the night 00:00–08:00 (the current one before 08:00, otherwise the next one)
+  // Work from home: the next weekday whose 09:00 is still ahead; average 09–17
   const nowA = hk(now);
-  const nightKey = nowA.h < 8 ? nowA.key : hk(now + DAY).key;
-  const nightSlots = allSlots.filter(s => { const a = hk(s.t); return a.key === nightKey && a.h < 8; });
-  const nightDone = nightSlots.length && hk(nightSlots[nightSlots.length - 1].t).hm === "07:45" && hk(nightSlots[0].t).hm === "00:00";
-  const charge = nightDone ? {
-    start: nightSlots[0].t, end: nightSlots[nightSlots.length - 1].t + SLOT,
-    avg: mean(nightSlots.map(s => s.p)),
-    weekNightAvg: mean(hist.filter(s => hk(s.t).h < 8).map(s => s.p)),
-  } : null;
-
-  // Bad days: most expensive 8h block, plus per-day averages
-  const w32 = windows(up, 32);
-  const worst8 = w32.length ? maxBy(w32, w => w.avg) : null;
-  const byDay = {};
-  for (const s of allSlots) { if (s.t < nowSlot - DAY) continue; const k = hk(s.t).key; (byDay[k] = byDay[k] || []).push(s.p); }
-  const todayKey = hk(now).key;
-  const days = Object.keys(byDay).sort().filter(k => k >= todayKey && byDay[k].length >= 88)
-    .map(k => ({ key: k, avg: mean(byDay[k]), max: Math.max(...byDay[k]) }));
-
-  return { nowSlot, up, hist, weekAvg, current, dish, laundry, dinner, dinnerWeekAvg, dinnerWeekAvgCost, charge, worst8, days,
-           histDays: hist.length / 96, lastSlot: allSlots.length ? allSlots[allSlots.length - 1].t + SLOT : null };
-}
-
-// Price level relative to the past week (fallback: absolute thresholds)
-function level(p, ref) {
-  if (ref != null && ref > 0.5) {
-    const r = p / ref;
-    if (r < 0.75) return ["good", "Cheap"];
-    if (r < 1.25) return ["mid", "Normal"];
-    if (r < 1.75) return ["warn", "High"];
-    return ["bad", "Very high"];
+  let wfh = null;
+  for (let d = 0; d < 4 && !wfh; d++) {
+    const a = hk(now + d * DAY);
+    if (a.wd === "Sat" || a.wd === "Sun") continue;
+    if (d === 0 && nowA.h >= 9) continue;
+    const slots = allSlots.filter(s => { const b = hk(s.t); return b.key === a.key && b.h >= 9 && b.h < 17; });
+    if (slots.length >= 32) { const avg = mean(slots.map(s => s.p)); wfh = { key: a.key, avg, start: slots[0].t, end: slots[slots.length - 1].t + SLOT, status: avg > LIMIT ? "bad" : "good" }; }
+    else wfh = { key: a.key, missing: true, status: "none" };
   }
-  if (p < 3) return ["good", "Cheap"];
-  if (p < 8) return ["mid", "Normal"];
-  if (p < 15) return ["warn", "High"];
-  return ["bad", "Very high"];
+
+  // Below zero: runs of upcoming slots with a negative price
+  const neg = [];
+  for (const s of up) {
+    if (s.p >= 0) continue;
+    const lastRun = neg[neg.length - 1];
+    if (lastRun && lastRun.end === s.t) { lastRun.end = s.t + SLOT; lastRun.min = Math.min(lastRun.min, s.p); }
+    else neg.push({ start: s.t, end: s.t + SLOT, min: s.p });
+  }
+
+  return { nowSlot, up, current, dish, laundry, dinner, wfh, neg,
+           lastSlot: allSlots.length ? allSlots[allSlots.length - 1].t + SLOT : null };
 }
-if (typeof module !== "undefined") module.exports = { SLOT, DAY, eurMwhToCents, hk, toSlots, windows, analyse, level, APPLIANCES };
+if (typeof module !== "undefined") module.exports = { SLOT, DAY, LIMIT, eurMwhToCents, hk, toSlots, windows, analyse, APPLIANCES };
 </script>
 
 <script>
@@ -302,149 +276,133 @@ function diagnostics(errors) {
   return parts.join(" · ");
 }
 
+
 /* ===== Formatting ===== */
-const c2 = p => p.toFixed(2);
 function money(eur) {
   const a = Math.abs(eur);
   return a < 1 ? `${(a * 100).toFixed(a * 100 < 10 ? 1 : 0)} c` : `€${a.toFixed(2)}`;
 }
-function when(t, now) {
-  const a = hk(t), today = hk(now).key, tom = hk(now + DAY).key;
-  const d = a.key === today ? "Today" : a.key === tom ? "Tomorrow" : a.wd;
-  return `${d} ${a.hm}`;
-}
+const c1 = p => p.toFixed(1).replace("-", "−");
 function dayName(key, now) {
   if (key === hk(now).key) return "Today";
   if (key === hk(now + DAY).key) return "Tomorrow";
   const [y, m, d] = key.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
 }
-const range = (w, now) => `${when(w.start, now)}–${hk(w.end).hm}`;
-function chip(p, ref) { const [cls, txt] = level(p, ref); return `<span class="chip lv-${cls}">${txt}</span>`; }
-function costRow(label, eurDiff) {
-  if (eurDiff == null) return "";
-  const cls = eurDiff >= 0 ? "pos" : "negv";
-  const txt = Math.abs(eurDiff) < 0.0005 ? "same" : `${eurDiff >= 0 ? "save" : "costs"} ${money(Math.abs(eurDiff))}`;
-  return `<div class="row"><span>${label}</span><span class="${cls}">${txt}</span></div>`;
+function when(t, now) { return `${dayName(hk(t).key, now)} ${hk(t).hm}`; }
+const endHm = t => hk(t).hm === "00:00" ? "24:00" : hk(t).hm;
+
+const ICONS = {
+  dish: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3" width="15" height="18" rx="2"/><path d="M4.5 8h15"/><path d="M8 5.5h.01M11 5.5h.01"/><path d="M8.5 13.5c1.2-1.3 2.4-1.3 3.5 0s2.3 1.3 3.5 0M8.5 17c1.2-1.3 2.4-1.3 3.5 0s2.3 1.3 3.5 0"/></svg>',
+  laundry: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3" width="15" height="18" rx="2"/><circle cx="12" cy="13.5" r="4.5"/><path d="M8 6h.01M11 6h4"/><path d="M9.6 14.3c1.3-.9 3.5.9 4.8 0"/></svg>',
+  dinner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18"/><path d="M5 11v6.5A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5V11"/><path d="M9 4.5c0 1.2 1 1.3 1 2.5M13 4.5c0 1.2 1 1.3 1 2.5"/></svg>',
+  wfh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></svg>',
+  neg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/></svg>',
+};
+function item(id, status, name, verdict, detail) {
+  return `<button type="button" class="item st-${status}${selected === id ? " sel" : ""}" data-id="${id}">
+    <span class="ic" aria-hidden="true">${ICONS[id]}</span>
+    <span class="txt"><span class="name">${name}</span><span class="verdict">${verdict}</span>${detail ? `<span class="detail">${detail}</span>` : ""}</span></button>`;
 }
-const fmtKwh = prof => kwhOf(prof).toFixed(kwhOf(prof) < 1 ? 2 : 1);
+const NOT_YET = "Tomorrow's prices arrive around 14:00";
 
 /* ===== Render ===== */
 function render() {
   if (!last) return;
-  const { slots, sources } = last;
   const n = Date.now();
-  const A = analyse(slots, n);
-  const cards = [];
+  const A = analyse(last.slots, n);
+  const out = [];
 
   // Now
+  const nowEl = document.getElementById("now");
   if (A.current) {
-    document.getElementById("nowPrice").textContent = c2(A.current.p);
-    document.getElementById("nowChip").innerHTML = chip(A.current.p, A.weekAvg) + (A.weekAvg != null ? ` <span class="sub">week avg <span class="num">${c2(A.weekAvg)}</span></span>` : "");
+    document.getElementById("nowPrice").textContent = c1(A.current.p);
+    nowEl.className = "now st-" + (A.current.p < LIMIT ? "good" : "bad");
   }
 
-  // Dishwasher
-  if (A.dish) {
-    const { best, worst, now: nw } = A.dish;
-    cards.push(card("dish", "Dishwasher", "Eco 50 · 3 h 15 min", `Start ${when(best.start, n)}`,
-      `≈ ${money(best.cost)} per run (${fmtKwh(APPLIANCES.dish)} kWh) · done ${hk(best.end).hm}`,
-      costRow("vs starting now", nw ? nw.cost - best.cost : null) +
-      costRow(`vs worst start (${when(worst.start, n)})`, worst.cost - best.cost), best));
-  } else cards.push(emptyCard("dish", "Dishwasher", "Eco 50 · 3 h 15 min"));
-
-  // Laundry
-  if (A.laundry) {
-    const { best, worst, weekBest } = A.laundry;
-    const vsWeek = weekBest ? (best.cost <= weekBest.cost + 0.0005
-      ? `<div class="row"><span>Week's cheapest wash (${when(weekBest.start, n)}, ${money(weekBest.cost)})</span><span class="pos">this beats it</span></div>`
-      : `<div class="row"><span>Week's cheapest wash (${when(weekBest.start, n)})</span><span>${money(weekBest.cost)}, ${money(best.cost - weekBest.cost)} less</span></div>`) : "";
-    cards.push(card("laundry", "Laundry", "40 °C · 1 h 30 min", `Start ${when(best.start, n)}`,
-      `≈ ${money(best.cost)} per load (${fmtKwh(APPLIANCES.laundry)} kWh) · ${chip(best.avg, A.weekAvg)}`,
-      vsWeek + costRow(`vs worst start (${when(worst.start, n)})`, worst.cost - best.cost), best));
-  } else cards.push(emptyCard("laundry", "Laundry", "40 °C · 1 h 30 min"));
+  // Dishwasher & laundry
+  for (const [id, name, label] of [["dish", "Dishwasher", "Eco 50"], ["laundry", "Laundry", "40 °C"]]) {
+    const r = A[id];
+    if (!r) { out.push(item(id, "none", name, "Not enough prices yet", NOT_YET)); continue; }
+    const { status, best, now: nw } = r;
+    if (status === "good") {
+      out.push(item(id, "good", name, "Any time is fine", `Now: ${money(nw.cost)} · ${label}`));
+    } else if (status === "warn") {
+      const save = nw ? ` · saves ${money(nw.cost - best.cost)}` : "";
+      out.push(item(id, "warn", name, `Wait until ${when(best.start, n)}`, `${money(best.cost)} then${save}`));
+    } else {
+      out.push(item(id, "bad", name, `Over ${LIMIT} c/kWh until ${when(A.lastSlot - 1, n).split(" ")[0]} ${endHm(A.lastSlot)}`, `Least bad: ${when(best.start, n)} · ${money(best.cost)}`));
+    }
+  }
 
   // Dinner
-  if (A.dinner.length) {
-    const ev = A.dinner[0];
-    const rest = A.dinner.slice(1).map(d => `<div class="row"><span>${dayName(d.key, n)}: start ${hk(d.best.start).hm}</span><span class="num">${money(d.best.cost)}</span></div>`).join("");
-    const week = A.dinnerWeekAvgCost != null ? costRow("vs last week's average dinner", A.dinnerWeekAvgCost - ev.best.cost) : "";
-    cards.push(card("dinner", "Dinner", "Hob + oven · 1 h, 17–21", `${dayName(ev.key, n)}: start ${hk(ev.best.start).hm}`,
-      `≈ ${money(ev.best.cost)} at most (${fmtKwh(APPLIANCES.dinner)} kWh) · ${chip(ev.best.avg, A.dinnerWeekAvg ?? A.weekAvg)}`,
-      costRow(`vs worst start (${hk(ev.worst.start).hm})`, ev.worst.cost - ev.best.cost) + week + rest, ev.best));
-  } else cards.push(emptyCard("dinner", "Dinner", "Hob + oven · 1 h, 17–21", "No evening slots left with known prices. Tomorrow's arrive around 14:00."));
+  if (A.dinner) {
+    const { key, best, worst, status } = A.dinner;
+    const day = key === hk(n).key ? "Tonight" : dayName(key, n);
+    const save = worst.cost - best.cost >= 0.005 ? ` · saves ${money(worst.cost - best.cost)} vs ${hk(worst.start).hm}` : "";
+    if (status === "good") out.push(item("dinner", "good", "Dinner", `${day}: start ${hk(best.start).hm}`, `${money(best.cost)}${save}`));
+    else out.push(item("dinner", "bad", "Dinner", `${day}: over ${LIMIT} c/kWh`, `Cheapest: start ${hk(best.start).hm} · ${money(best.cost)}`));
+  } else out.push(item("dinner", "none", "Dinner", "No evening prices yet", NOT_YET));
 
-  // Charging overnight
-  if (A.charge) {
-    const c = A.charge;
-    const night = hk(c.start).key === hk(n).key ? "Tonight (now)" : (hk(c.start).key === hk(n + DAY).key ? "Tonight" : dayName(hk(c.start).key, n) + " night");
-    const vs = c.weekNightAvg != null ? `<div class="row"><span>Last week's nights</span><span class="num">${c2(c.weekNightAvg)} c/kWh</span></div>` : "";
-    cards.push(card("charge", "Charge overnight", "00–08", `${night}: ${c2(c.avg)} c/kWh`,
-      `Average for 00:00–08:00 · ${chip(c.avg, c.weekNightAvg ?? A.weekAvg)}`, vs, c));
-  } else cards.push(emptyCard("charge", "Charge overnight", "00–08", "Tonight's prices aren't published yet. They arrive around 14:00."));
+  // Work from home
+  const w = A.wfh;
+  if (!w) out.push(item("wfh", "none", "Work from home", "No workday in the next few days", ""));
+  else if (w.missing) out.push(item("wfh", "none", "Work from home", `${dayName(w.key, n)}: prices not out yet`, "They arrive the day before around 14:00"));
+  else out.push(item("wfh", w.status, "Work from home",
+    `${dayName(w.key, n)}: ${w.status === "bad" ? "go to the office" : "home is fine"}`,
+    `09–17 average ${c1(w.avg)} c/kWh`));
 
-  // Bad days
-  {
-    const dayRows = A.days.map(d => `<div class="day"><span>${dayName(d.key, n)} <span class="sub">avg <span class="num">${c2(d.avg)}</span> · peak <span class="num">${c2(d.max)}</span></span></span>${chip(d.avg, A.weekAvg)}</div>`).join("");
-    const w = A.worst8;
-    const head = w ? `Worst 8 h: ${range(w, n)}` : "Not enough upcoming prices";
-    const meta = w ? `Average <span class="num">${c2(w.avg)}</span> c/kWh` + (A.weekAvg != null ? ` · ${(w.avg / A.weekAvg).toFixed(1)}× the week's average` : "") : "";
-    cards.push(`<button type="button" class="card${selected === "bad" ? " sel" : ""}" data-id="bad">
-      <div class="top"><span class="label">Bad days ahead</span>${w ? chip(w.avg, A.weekAvg) : ""}</div>
-      <div class="answer">${head}</div>${meta ? `<div class="meta">${meta}</div>` : ""}
-      ${dayRows ? `<div class="rows days">${dayRows}</div>` : ""}</button>`);
-  }
+  // Below zero
+  if (A.neg.length) {
+    const r = A.neg[0], more = A.neg.length > 1 ? ` · ${A.neg.length - 1} more period${A.neg.length > 2 ? "s" : ""}` : "";
+    out.push(item("neg", "good", "Below zero", `${when(r.start, n)}–${endHm(r.end)}`, `Lowest ${c1(r.min)} c/kWh${more}`));
+  } else out.push(item("neg", "none", "Below zero", "Not in known prices", A.lastSlot ? `Known until ${dayName(hk(A.lastSlot - 1).key, n)} ${endHm(A.lastSlot)}` : ""));
 
-  document.getElementById("cards").innerHTML = cards.join("");
-  const blocks = { dish: A.dish && A.dish.best, laundry: A.laundry && A.laundry.best, dinner: A.dinner[0] && A.dinner[0].best, charge: A.charge, bad: A.worst8 };
-  drawChart(A, blocks[selected], n);
-  const names = { dish: "Dishwasher", laundry: "Laundry", dinner: "Dinner", charge: "Overnight charging", bad: "Worst 8 h" };
-  document.getElementById("chartSel").textContent = blocks[selected] ? `Highlighted: ${names[selected]} ${range(blocks[selected], n)}` : "Tap a card to highlight its time block";
-}
+  document.getElementById("list").innerHTML = out.join("");
 
-function card(id, label, dur, answer, meta, rows, w) {
-  return `<button type="button" class="card${selected === id ? " sel" : ""}" data-id="${id}">
-    <div class="top"><span class="label">${label}</span><span class="dur">${dur}</span></div>
-    <div class="answer">${answer}</div><div class="meta">${meta}</div>
-    ${rows ? `<div class="rows">${rows}</div>` : ""}</button>`;
-}
-function emptyCard(id, label, dur, msg) {
-  return `<button type="button" class="card" data-id="${id}"><div class="top"><span class="label">${label}</span><span class="dur">${dur}</span></div>
-    <div class="empty">${msg || "Not enough upcoming prices yet. Tomorrow's arrive around 14:00."}</div></button>`;
+  const blocks = {
+    dish: A.dish && (A.dish.status === "good" ? A.dish.now : A.dish.best),
+    laundry: A.laundry && (A.laundry.status === "good" ? A.laundry.now : A.laundry.best),
+    dinner: A.dinner && A.dinner.best,
+    wfh: A.wfh && !A.wfh.missing ? A.wfh : null,
+    neg: A.neg[0] || null,
+  };
+  const b = blocks[selected];
+  drawChart(A, b, n);
+  const names = { dish: "Dishwasher", laundry: "Laundry", dinner: "Dinner", wfh: "Workday", neg: "Below zero" };
+  document.getElementById("chartSel").textContent = b ? `${names[selected]}: ${when(b.start, n)}–${endHm(b.end)}` : "";
 }
 
 function drawChart(A, block, n) {
   const svg = document.getElementById("chart");
   const up = A.up;
   if (!up.length) { svg.innerHTML = ""; return; }
-  const W = 400, H = 130, padL = 26, padB = 18, padT = 6;
+  const W = 400, H = 130, padL = 22, padB = 18, padT = 6;
   const cw = W - padL - 2, ch = H - padB - padT;
   const t0 = up[0].t, t1 = up[up.length - 1].t + SLOT;
-  const lo = Math.min(0, ...up.map(s => s.p)), hi = Math.max(1, ...up.map(s => s.p));
-  const yMax = Math.ceil(hi / 5) * 5, yMin = lo < 0 ? Math.floor(lo) : 0;
+  const lo = Math.min(0, ...up.map(s => s.p)), hi = Math.max(...up.map(s => s.p));
+  const yMax = Math.max(20, Math.ceil(hi / 5) * 5), yMin = lo < 0 ? Math.floor(lo) : 0;
   const x = t => padL + (t - t0) / (t1 - t0) * cw;
   const y = p => padT + (yMax - p) / (yMax - yMin) * ch;
   const bw = Math.max(0.6, cw / ((t1 - t0) / SLOT) - 0.3);
   let g = "";
-  // grid
-  const step = yMax <= 10 ? 2 : yMax <= 25 ? 5 : 10;
-  for (let v = yMin; v <= yMax; v += step) g += `<line x1="${padL}" x2="${W - 2}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="0.6"/><text x="${padL - 4}" y="${y(v) + 3}" font-size="8" text-anchor="end" fill="var(--muted)" font-family="var(--font-num)">${v}</text>`;
+  const step = yMax <= 25 ? 5 : 10;
+  for (let v = 0; v <= yMax; v += step) g += `<line x1="${padL}" x2="${W - 2}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="0.6"/><text x="${padL - 4}" y="${y(v) + 3}" font-size="8" text-anchor="end" fill="var(--muted)" font-family="var(--font-num)">${v}</text>`;
   if (block && block.end > t0) { const bs = Math.max(block.start, t0), be = Math.min(block.end, t1); g += `<rect x="${x(bs)}" y="${padT}" width="${x(be) - x(bs)}" height="${ch}" fill="var(--accent-soft)"/>`; }
   for (const s of up) {
-    const [cls] = level(s.p, A.weekAvg);
-    const col = { good: "var(--good)", mid: "var(--muted)", warn: "var(--warn)", bad: "var(--bad)" }[cls];
+    const col = s.p < 0 ? "var(--good)" : s.p < LIMIT ? "var(--muted)" : "var(--bad)";
     const inB = block && s.t >= block.start && s.t < block.end;
     const top = Math.min(y(s.p), y(0)), h = Math.max(0.5, Math.abs(y(s.p) - y(0)));
-    g += `<rect x="${x(s.t)}" y="${top}" width="${bw}" height="${h}" fill="${inB ? "var(--accent)" : col}" opacity="${inB ? 1 : 0.75}"/>`;
+    g += `<rect x="${x(s.t)}" y="${top}" width="${bw}" height="${h}" fill="${inB ? "var(--accent)" : col}" opacity="${inB ? 1 : 0.7}"/>`;
   }
-  // hour labels every 6h on Helsinki time, plus day changes
-  for (let t = Math.ceil(t0 / (60 * 60 * 1000)) * 60 * 60 * 1000; t < t1; t += 60 * 60 * 1000) {
+  g += `<line x1="${padL}" x2="${W - 2}" y1="${y(LIMIT)}" y2="${y(LIMIT)}" stroke="var(--bad)" stroke-width="0.8" stroke-dasharray="3 2"/>`;
+  for (let t = Math.ceil(t0 / 3600000) * 3600000; t < t1; t += 3600000) {
     const a = hk(t);
     if (a.h % 6 !== 0) continue;
-    const lab = a.h === 0 ? (a.key === hk(n + DAY).key ? "Tmrw" : a.wd) : `${String(a.h).padStart(2, "0")}`;
+    const lab = a.h === 0 ? (a.key === hk(n + DAY).key ? "Tmrw" : a.wd) : String(a.h).padStart(2, "0");
     g += `<line x1="${x(t)}" x2="${x(t)}" y1="${padT + ch}" y2="${padT + ch + 3}" stroke="var(--muted)" stroke-width="0.6"/>`;
     g += `<text x="${x(t)}" y="${H - 5}" font-size="8" text-anchor="middle" fill="var(--muted)" font-family="var(--font-num)"${a.h === 0 ? ' font-weight="600"' : ""}>${lab}</text>`;
   }
-  g += `<line x1="${x(A.nowSlot)}" x2="${x(A.nowSlot)}" y1="${padT}" y2="${padT + ch}" stroke="var(--fg)" stroke-width="0.8" stroke-dasharray="2 2"/>`;
   svg.innerHTML = g;
 }
 
@@ -472,8 +430,9 @@ function showError(box, msg, errors) {
 }
 
 
-document.getElementById("cards").addEventListener("click", e => {
-  const c = e.target.closest(".card"); if (!c) return;
+
+document.getElementById("list").addEventListener("click", e => {
+  const c = e.target.closest(".item"); if (!c) return;
   selected = c.dataset.id; render();
 });
 document.getElementById("refresh").addEventListener("click", refresh);
