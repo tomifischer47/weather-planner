@@ -124,7 +124,7 @@ footer{color:var(--muted);font-size:.78rem;line-height:1.5}
   </details>
 
   <footer>
-    Spot prices for the Finland bidding zone in 15-minute steps, shown with 25.5 % VAT. Data from Nord Pool via the Elering dashboard API, with Pörssisähkö.net as backup. Tomorrow's prices usually appear around 14:00.
+    Spot prices for the Finland bidding zone in 15-minute steps, shown with 25.5 % VAT. Upcoming prices from spot-hinta.fi; the past week's prices (hourly) from sahkotin.fi. Both republish Nord Pool day-ahead prices. Tomorrow's prices usually appear around 14:00.
   </footer>
 </main>
 
@@ -227,7 +227,7 @@ if (typeof module !== "undefined") module.exports = { SLOT, DAY, eurMwhToCents, 
 
 <script>
 /* ===== Data loading ===== */
-const CACHE_KEY = "hsp-prices-v1", SET_KEY = "hsp-settings-v1";
+const CACHE_KEY = "hsp-prices-v2", SET_KEY = "hsp-settings-v1";
 const DEFAULTS = { kwhDish: 1.0, kwhLaundry: 1.0, kwhDinner: 2.0, kwhCharge: 3.0, extra: 0 };
 let settings = { ...DEFAULTS };
 let selected = "dish";
@@ -242,40 +242,41 @@ async function fetchJson(url, ms = 12000) {
   finally { clearTimeout(id); }
 }
 
-async function fromElering(now) {
-  const start = new Date(now - 8 * DAY).toISOString(), end = new Date(now + 3 * DAY).toISOString();
-  const j = await fetchJson(`https://dashboard.elering.ee/api/nps/price?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
-  const rows = (j && j.data && j.data.fi) || [];
+// spot-hinta.fi: today + tomorrow in 15-minute steps, €/kWh without VAT
+async function fromSpotHinta() {
+  const j = await fetchJson("https://api.spot-hinta.fi/TodayAndDayForward");
   const m = new Map();
-  rows.sort((a, b) => a.timestamp - b.timestamp);
-  rows.forEach((r, i) => {
-    const t = r.timestamp * 1000;
-    const next = rows[i + 1] ? rows[i + 1].timestamp * 1000 : t + SLOT;
-    const span = Math.max(SLOT, Math.min(next - t, 60 * 60 * 1000)); // hourly rows fill four slots
-    for (let s = t; s < t + span; s += SLOT) m.set(s, eurMwhToCents(r.price));
-  });
+  for (const r of (Array.isArray(j) ? j : [])) m.set(Date.parse(r.DateTime), eurMwhToCents(r.PriceNoTax * 1000));
   return m;
 }
-async function fromPorssisahko() {
-  const j = await fetchJson("https://api.porssisahko.net/v2/latest-prices.json");
+// sahkotin.fi: hourly €/MWh without VAT, used for the past week (each hour fills four 15-min slots)
+async function fromSahkotin(now) {
+  const start = new Date(now - 8 * DAY).toISOString(), end = new Date(now + 3 * DAY).toISOString();
+  const j = await fetchJson(`https://sahkotin.fi/prices?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
   const m = new Map();
-  for (const r of (j.prices || [])) m.set(Date.parse(r.startDate), r.price);
+  for (const r of (j.prices || [])) {
+    const t = Date.parse(r.date);
+    for (let s = t; s < t + 60 * 60 * 1000; s += SLOT) m.set(s, eurMwhToCents(r.value));
+  }
   return m;
 }
 
 async function load() {
   const now = Date.now();
   const merged = new Map();
+  const [sk, sh] = await Promise.allSettled([fromSahkotin(now), fromSpotHinta()]);
+  if (sk.status === "fulfilled") for (const [t, p] of sk.value) merged.set(t, p);
   const cached = recall(CACHE_KEY) || [];
-  for (const [t, p] of cached) if (t > now - 10 * DAY) merged.set(t, p);
-  const [el, ps] = await Promise.allSettled([fromElering(now), fromPorssisahko()]);
-  if (ps.status === "fulfilled") for (const [t, p] of ps.value) merged.set(t, p);
-  if (el.status === "fulfilled") for (const [t, p] of el.value) merged.set(t, p);
-  const sources = [el.status === "fulfilled" && el.value.size ? "Elering" : null, ps.status === "fulfilled" && ps.value.size ? "Pörssisähkö" : null].filter(Boolean);
-  store(CACHE_KEY, [...merged.entries()]);
+  for (const [t, p] of cached) if (t > now - 10 * DAY) merged.set(t, p); // earlier 15-min prices beat hourly ones
+  if (sh.status === "fulfilled") for (const [t, p] of sh.value) merged.set(t, p);
+  const sources = [sh.status === "fulfilled" && sh.value.size ? "spot-hinta.fi" : null, sk.status === "fulfilled" && sk.value.size ? "sahkotin.fi" : null].filter(Boolean);
+  // Only 15-minute prices go into the saved history
+  const keep = new Map(cached.filter(([t]) => t > now - 10 * DAY));
+  if (sh.status === "fulfilled") for (const [t, p] of sh.value) keep.set(t, p);
+  store(CACHE_KEY, [...keep.entries()]);
   const errors = [];
-  if (el.status === "rejected") errors.push(`Elering: ${describe(el.reason)}`);
-  if (ps.status === "rejected") errors.push(`Pörssisähkö: ${describe(ps.reason)}`);
+  if (sh.status === "rejected") errors.push(`spot-hinta.fi: ${describe(sh.reason)}`);
+  if (sk.status === "rejected") errors.push(`sahkotin.fi: ${describe(sk.reason)}`);
   return { slots: toSlots(merged), sources, now, errors };
 }
 function describe(e) {
@@ -460,7 +461,7 @@ async function refresh() {
     render();
   } catch (e) {
     err.hidden = false;
-    showError(err, "Couldn't load prices from Elering or Pörssisähkö.net. Check your connection and tap Refresh.", e.errors || [`Page: ${describe(e)}`]);
+    showError(err, "Couldn't load prices from spot-hinta.fi or sahkotin.fi. Check your connection and tap Refresh.", e.errors || [`Page: ${describe(e)}`]);
   } finally { btn.textContent = "Refresh"; btn.disabled = false; }
 }
 function showError(box, msg, errors) {
