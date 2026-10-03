@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Sähkö">
 <meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#11161c" media="(prefers-color-scheme: dark)">
-<title>Helsinki Spot Planner</title>
+<title>Electricity Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -38,7 +38,7 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font-ui);-webkit-text-size-adjust:100%}
 main{max-width:560px;margin:0 auto;padding:16px 16px 40px;display:flex;flex-direction:column;gap:14px}
 .num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
 h1{font-size:1.05rem;font-weight:700;margin:0;letter-spacing:.01em}
 .sub{color:var(--muted);font-size:.82rem}
 button{font:inherit;color:inherit}
@@ -78,17 +78,13 @@ button{font:inherit;color:inherit}
 
 .err{background:var(--bad-soft);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:.9rem;display:flex;flex-direction:column;gap:6px}
 .err .detail{font-size:.75rem;opacity:.85;overflow-wrap:anywhere;user-select:text}
-footer{color:var(--muted);font-size:.78rem;line-height:1.5}
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s,box-shadow .15s}}
 </style>
 </head>
 <body>
 <main>
   <header>
-    <div>
-      <h1>Helsinki Spot Planner</h1>
-      <div class="sub" id="coverage">Loading prices…</div>
-    </div>
+    <h1>Electricity Planner</h1>
     <button class="refresh" id="refresh" type="button">Refresh</button>
   </header>
 
@@ -102,15 +98,12 @@ footer{color:var(--muted);font-size:.78rem;line-height:1.5}
 
   <section class="chart" aria-label="Upcoming prices">
     <svg id="chart" viewBox="0 0 400 130" role="img" aria-label="Bar chart of upcoming 15-minute prices"></svg>
-    <div class="legend"><span id="chartSel">Tap a card to highlight its time block</span><span>c/kWh incl. VAT</span></div>
+    <div class="legend"><span id="chartSel">Tap a card to highlight its time block</span><span>c/kWh</span></div>
   </section>
 
   <section class="cards" id="cards"></section>
 
 
-  <footer>
-    Spot prices for the Finland bidding zone in 15-minute steps, shown with 25.5 % VAT. Upcoming prices from spot-hinta.fi; the past week's prices (hourly) from sahkotin.fi. Both republish Nord Pool day-ahead prices. Tomorrow's prices usually appear around 14:00. Costs are the spot price only; your retailer margin, transfer fee and tax come on top but are the same at every hour, so the savings are unaffected.
-  </footer>
 </main>
 
 <script id="logic">
@@ -344,12 +337,7 @@ function render() {
   const A = analyse(slots, n);
   const cards = [];
 
-  // Header + now
-  if (A.lastSlot) {
-    const hist = A.histDays >= 6.5 ? "7 days" : `${Math.max(0, A.histDays).toFixed(1)} days`;
-    const endHm = hk(A.lastSlot).hm === "00:00" ? "24:00" : hk(A.lastSlot).hm;
-    document.getElementById("coverage").textContent = `Prices known until ${dayName(hk(A.lastSlot - 1).key, n)} ${endHm} · week avg from ${hist} · ${sources.join(" + ") || "saved data"}`;
-  }
+  // Now
   if (A.current) {
     document.getElementById("nowPrice").textContent = c2(A.current.p);
     document.getElementById("nowChip").innerHTML = chip(A.current.p, A.weekAvg) + (A.weekAvg != null ? ` <span class="sub">week avg <span class="num">${c2(A.weekAvg)}</span></span>` : "");
